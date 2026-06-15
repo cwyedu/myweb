@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>幾何圖形動畫</title>
+
+  <style>
+    :root {
+      --main-color: #00ccff;
+      --background-color: #111827;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--background-color);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: Arial, sans-serif;
+    }
+
+    .container {
+      position: relative;
+      width: 80vw;
+      height: 80vh;
+    }
+
+    .shape {
+      position: absolute;
+      animation: rotateScale 4s infinite ease-in-out;
+      transition: background-color 0.5s, border-bottom-color 0.5s;
+    }
+
+    .circle {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background-color: var(--main-color);
+      top: 10%;
+      left: 15%;
+    }
+
+    .square {
+      width: 120px;
+      height: 120px;
+      background-color: var(--main-color);
+      top: 50%;
+      left: 45%;
+      animation-delay: 0.8s;
+    }
+
+    .triangle {
+      width: 0;
+      height: 0;
+      border-left: 70px solid transparent;
+      border-right: 70px solid transparent;
+      border-bottom: 130px solid var(--main-color);
+      background: transparent;
+      top: 20%;
+      right: 15%;
+      animation-delay: 1.5s;
+    }
+
+    .circle.small {
+      width: 80px;
+      height: 80px;
+      top: 65%;
+      left: 20%;
+      animation-delay: 2s;
+    }
+
+    .square.small {
+      width: 90px;
+      height: 90px;
+      top: 15%;
+      left: 55%;
+      animation-delay: 2.5s;
+    }
+
+    @keyframes rotateScale {
+      0% {
+        transform: rotate(0deg) scale(1);
+      }
+      50% {
+        transform: rotate(180deg) scale(1.4);
+      }
+      100% {
+        transform: rotate(360deg) scale(1);
+      }
+    }
+
+    h1 {
+      position: absolute;
+      top: 30px;
+      width: 100%;
+      text-align: center;
+      color: white;
+      letter-spacing: 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>幾何圖形動畫</h1>
+
+  <div class="container">
+    <div class="shape circle"></div>
+    <div class="shape square"></div>
+    <div class="shape triangle"></div>
+    <div class="shape circle small"></div>
+    <div class="shape square small"></div>
+  </div>
+
+  <script>
+    const shapes = document.querySelectorAll(".shape");
+
+    function randomColor() {
+      const letters = "0123456789ABCDEF";
+      let color = "#";
+
+      for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+
+      return color;
+    }
+
+    function changeShapeColors() {
+      shapes.forEach(shape => {
+        const color = randomColor();
+
+        if (shape.classList.contains("triangle")) {
+          shape.style.borderBottomColor = color;
+        } else {
+          shape.style.backgroundColor = color;
+        }
+      });
+    }
+
+    setInterval(changeShapeColors, 1000);
+  </script>
+</body>
+</html>
