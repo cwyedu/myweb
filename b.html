@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>二進位猜生日魔術</title>
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: "Microsoft JhengHei", Arial, sans-serif;
+        background: #f4f6f9;
+        margin: 0;
+        padding: 20px;
+        color: #333;
+    }
+
+    h1 {
+        text-align: center;
+        color: #2c3e50;
+    }
+
+    .intro {
+        max-width: 1000px;
+        margin: 0 auto 20px;
+        background: white;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+
+    .cards-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .card {
+        background: white;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.1);
+        transition: transform .2s;
+        border: 3px solid transparent;
+    }
+
+    .card:hover {
+        transform: translateY(-3px);
+    }
+
+    .card.selected {
+        border-color: #3498db;
+        background: #eef7ff;
+    }
+
+    .card-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        font-weight: bold;
+        font-size: 1.1rem;
+    }
+
+    .numbers {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+    }
+
+    .number {
+        background: #ecf0f1;
+        padding: 6px;
+        text-align: center;
+        border-radius: 6px;
+        font-size: 0.95rem;
+    }
+
+    .controls {
+        text-align: center;
+        margin: 25px 0;
+    }
+
+    button {
+        padding: 12px 24px;
+        font-size: 1rem;
+        border: none;
+        border-radius: 8px;
+        background: #3498db;
+        color: white;
+        cursor: pointer;
+        transition: background .2s;
+    }
+
+    button:hover {
+        background: #2980b9;
+    }
+
+    .result {
+        max-width: 1000px;
+        margin: 20px auto;
+        background: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.08);
+        display: none;
+    }
+
+    .answer {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #e74c3c;
+        text-align: center;
+        margin: 15px 0;
+    }
+
+    .analysis {
+        margin-top: 20px;
+        line-height: 1.8;
+    }
+
+    .step {
+        background: #f8fafc;
+        border-left: 5px solid #3498db;
+        padding: 12px;
+        margin-bottom: 12px;
+        border-radius: 6px;
+    }
+
+    .binary {
+        font-family: Consolas, monospace;
+        font-weight: bold;
+        color: #8e44ad;
+    }
+</style>
+</head>
+<body>
+
+<h1>🎂 二進位猜生日魔術</h1>
+
+<div class="intro">
+    <p><strong>玩法：</strong></p>
+    <ol>
+        <li>請想一個生日日期（1～31）。</li>
+        <li>查看每張卡片，若你的生日數字有出現在卡片中，就勾選該卡片。</li>
+        <li>完成後按下「猜測我的生日」。</li>
+    </ol>
+</div>
+
+<div class="cards-container" id="cardsContainer"></div>
+
+<div class="controls">
+    <button onclick="guessBirthday()">猜測我的生日</button>
+</div>
+
+<div class="result" id="resultBox">
+    <h2>🔮 猜測結果</h2>
+
+    <div class="answer" id="answer"></div>
+
+    <div class="analysis">
+        <h3>📘 原理分析區</h3>
+
+        <div class="step" id="step1"></div>
+        <div class="step" id="step2"></div>
+        <div class="step" id="step3"></div>
+    </div>
+</div>
+
+<script>
+const cardStarts = [1, 2, 4, 8, 16];
+
+function generateCardNumbers(bitValue) {
+    const nums = [];
+
+    for (let i = 1; i <= 31; i++) {
+        if ((i & bitValue) !== 0) {
+            nums.push(i);
+        }
+    }
+
+    return nums;
+}
+
+function createCards() {
+    const container = document.getElementById("cardsContainer");
+
+    cardStarts.forEach(start => {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const numbers = generateCardNumbers(start);
+
+        card.innerHTML = `
+            <div class="card-header">
+                <input type="checkbox" id="card-${start}" data-value="${start}">
+                <label for="card-${start}">
+                    卡片起始數字：${start}
+                </label>
+            </div>
+            <div class="numbers">
+                ${numbers.map(n => `<div class="number">${n}</div>`).join("")}
+            </div>
+        `;
+
+        const checkbox = card.querySelector("input");
+
+        checkbox.addEventListener("change", () => {
+            card.classList.toggle("selected", checkbox.checked);
+        });
+
+        container.appendChild(card);
+    });
+}
+
+function toBinaryString(num) {
+    return num.toString(2).padStart(5, "0");
+}
+
+function guessBirthday() {
+    const checked = [...document.querySelectorAll("input[type='checkbox']:checked")];
+
+    const values = checked.map(c => Number(c.dataset.value));
+
+    const sum = values.reduce((a, b) => a + b, 0);
+
+    document.getElementById("resultBox").style.display = "block";
+
+    document.getElementById("answer").innerHTML =
+        `🎉 我猜你的生日日期是：<br>${sum}`;
+
+    let step1Text;
+
+    if (values.length === 0) {
+        step1Text =
+            `您沒有選擇任何卡片，因此總和為 0。`;
+    } else {
+        step1Text =
+            `您選擇了起始數字為 <strong>${values.join(", ")}</strong> 的卡片。<br>
+            總和是：<strong>${values.join(" + ")} = ${sum}</strong>`;
+    }
+
+    document.getElementById("step1").innerHTML =
+        `<strong>步驟 1：卡片加總</strong><br>${step1Text}`;
+
+    const binary = toBinaryString(sum);
+
+    const parts = [];
+
+    cardStarts.forEach((value, index) => {
+        if ((sum & value) !== 0) {
+            parts.unshift(`${value} (2^${Math.log2(value)})`);
+        }
+    });
+
+    document.getElementById("step2").innerHTML =
+        `<strong>步驟 2：二進位分解</strong><br>
+        這個總和 <strong>${sum}</strong> 的二進位表示為：
+        <span class="binary">${binary}<sub>2</sub></span><br>
+        因為：<strong>${parts.length ? parts.join(" + ") : "0"}</strong><br>
+        所以二進位中的每個位元，正好對應一張是否被選中的卡片。`;
+
+    document.getElementById("step3").innerHTML =
+        `<strong>步驟 3：最終答案</strong><br>
+        將所有被選中的卡片起始數字加總後得到 <strong>${sum}</strong>，因此推算出您的生日日期就是：<strong>${sum}</strong>。`;
+
+    document.getElementById("resultBox").scrollIntoView({
+        behavior: "smooth"
+    });
+}
+
+createCards();
+</script>
+
+</body>
+</html>
