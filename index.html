@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>數位時鐘</title>
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      font-family: Arial, sans-serif;
+      color: #00ffcc;
+      background:
+        radial-gradient(circle at 20% 20%, #333 2px, transparent 3px),
+        radial-gradient(circle at 80% 80%, #444 2px, transparent 3px),
+        linear-gradient(135deg, #050505, #1a1a1a);
+      background-size: 40px 40px, 40px 40px, cover;
+    }
+
+    #clock {
+      font-size: 15vw;
+      font-weight: bold;
+      letter-spacing: 8px;
+      text-shadow: 0 0 25px #00ffcc;
+    }
+
+    #quote {
+      margin-top: 30px;
+      font-size: 2rem;
+      text-align: center;
+      color: #ffffff;
+      opacity: 0.9;
+      padding: 0 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="clock">00:00:00</div>
+  <div id="quote"></div>
+
+  <script>
+    const quotes = [
+      "今天的努力，是明天的底氣。",
+      "不要等機會，而是創造機會。",
+      "再小的進步，也是前進。",
+      "相信自己，你比想像中更強。",
+      "成功不是偶然，而是每天累積。"
+    ];
+
+    function updateClock() {
+      const now = new Date();
+
+      const hours = String(now.getHours()).padStart(2, "0");
+      const minutes = String(now.getMinutes()).padStart(2, "0");
+      const seconds = String(now.getSeconds()).padStart(2, "0");
+
+      document.getElementById("clock").textContent =
+        `${hours}:${minutes}:${seconds}`;
+    }
+
+    function showRandomQuote() {
+      const randomIndex = Math.floor(Math.random() * quotes.length);
+      document.getElementById("quote").textContent = quotes[randomIndex];
+    }
+
+    updateClock();
+    showRandomQuote();
+
+    setInterval(updateClock, 1000);
+    setInterval(showRandomQuote, 5000);
+  </script>
+
+</body>
+</html>
