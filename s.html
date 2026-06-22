@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Snake - 霓虹玻璃擬態貪吃蛇</title>
+    <!-- 引入 Tailwind CSS 用於現代化佈局 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        darkBg: '#090d16',
+                        neonCyan: '#00f3ff',
+                        neonPink: '#ff007f',
+                        neonPurple: '#9d4edd',
+                    },
+                    boxShadow: {
+                        'neon-cyan': '0 0 15px rgba(0, 243, 255, 0.5), 0 0 30px rgba(0, 243, 255, 0.2)',
+                        'neon-pink': '0 0 15px rgba(255, 0, 127, 0.5), 0 0 30px rgba(255, 0, 127, 0.2)',
+                        'glass': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+TC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
+            background: radial-gradient(circle at center, #151b2e 0%, #090d16 100%);
+            overflow-x: hidden;
+        }
+
+        /* 玻璃擬態背景 */
+        .glass-panel {
+            background: rgba(13, 20, 38, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .glass-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(0, 243, 255, 0.5);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .glass-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* 霓虹文字效果 */
+        .text-neon-cyan {
+            text-shadow: 0 0 8px rgba(0, 243, 255, 0.6), 0 0 20px rgba(0, 243, 255, 0.3);
+        }
+        .text-neon-pink {
+            text-shadow: 0 0 8px rgba(255, 0, 127, 0.6), 0 0 20px rgba(255, 0, 127, 0.3);
+        }
+
+        /* 隱藏手機端雙擊縮放 */
+        touch-action-none {
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100 flex flex-col items-center justify-between p-4 md:p-6 touch-action-none">
+
+    <!-- 頂部：標題與裝飾 -->
+    <header class="w-full max-w-lg text-center mt-2 mb-4">
+        <h1 class="text-3xl md:text-4xl font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-neonCyan via-neonPurple to-neonPink animate-pulse">
+            NEON SNAKE
+        </h1>
+        <p class="text-xs text-slate-400 mt-1 uppercase tracking-widest">Futuristic Retro Grid</p>
+    </header>
+
+    <!-- 中間：主遊戲區域 -->
+    <main class="w-full max-w-lg flex flex-col gap-4 items-center">
+        
+        <!-- 計分板 (玻璃擬態) -->
+        <div class="w-full glass-panel rounded-2xl p-4 flex justify-between items-center shadow-glass">
+            <div class="flex items-center gap-3">
+                <div class="w-3 h-3 rounded-full bg-neonCyan animate-ping"></div>
+                <div>
+                    <div class="text-[10px] text-slate-400 uppercase tracking-wider">Current Score</div>
+                    <div id="score" class="text-2xl font-bold text-neonCyan text-neon-cyan">000</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 text-right">
+                <div>
+                    <div class="text-[10px] text-slate-400 uppercase tracking-wider">High Score</div>
+                    <div id="highScore" class="text-2xl font-bold text-neonPink text-neon-pink">000</div>
+                </div>
+                <div class="w-3 h-3 rounded-full bg-neonPink"></div>
+            </div>
+        </div>
+
+        <!-- 遊戲畫布容器 -->
+        <div class="relative w-full aspect-square glass-panel rounded-2xl overflow-hidden shadow-glass border border-white/10 flex items-center justify-center p-1">
+            <!-- 遊戲 Canvas -->
+            <canvas id="gameCanvas" class="w-full h-full rounded-xl block"></canvas>
+
+            <!-- 開始/暫停覆蓋畫面 -->
+            <div id="overlay" class="absolute inset-0 bg-darkBg/80 backdrop-blur-md flex flex-col items-center justify-center gap-6 transition-opacity duration-300">
+                <div class="text-center px-6">
+                    <h2 id="overlayTitle" class="text-2xl md:text-3xl font-black text-neonCyan text-neon-cyan mb-2">NEON ODYSSEY</h2>
+                    <p id="overlaySub" class="text-sm text-slate-400 max-w-xs mx-auto">
+                        滑動手機或使用 WASD / 方向鍵控制方向，避開邊界與自己的身體。
+                    </p>
+                </div>
+                <button id="startBtn" class="px-8 py-3 rounded-full font-bold uppercase tracking-widest text-darkBg bg-gradient-to-r from-neonCyan to-neonPurple hover:from-neonPurple hover:to-neonPink hover:text-white transition-all duration-300 transform hover:scale-105 shadow-neon-cyan">
+                    開始遊戲
+                </button>
+            </div>
+        </div>
+
+        <!-- 控制與選單按鈕 -->
+        <div class="w-full grid grid-cols-3 gap-3">
+            <button id="pauseBtn" class="glass-btn rounded-xl py-3 flex flex-col items-center justify-center gap-1 opacity-50 cursor-not-allowed" disabled>
+                <!-- 暫停 Icon -->
+                <svg id="pauseIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-neonCyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span id="pauseText" class="text-[10px] uppercase font-bold tracking-wider text-slate-300">暫停</span>
+            </button>
+            
+            <button id="soundBtn" class="glass-btn rounded-xl py-3 flex flex-col items-center justify-center gap-1">
+                <!-- 聲音 Icon -->
+                <svg id="soundIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-neonPurple" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                </svg>
+                <span class="text-[10px] uppercase font-bold tracking-wider text-slate-300">音效: 開</span>
+            </button>
+
+            <button id="resetBtn" class="glass-btn rounded-xl py-3 flex flex-col items-center justify-center gap-1">
+                <!-- 重置 Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-neonPink" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 15H19" />
+                </svg>
+                <span class="text-[10px] uppercase font-bold tracking-wider text-slate-300">重開</span>
+            </button>
+        </div>
+
+    </main>
+
+    <!-- 底部：操作指南與手機端輔助觸控指示 -->
+    <footer class="w-full max-w-lg mt-4 mb-2 text-center">
+        <div class="hidden md:flex justify-center gap-6 text-xs text-slate-500 uppercase tracking-widest">
+            <span>[W,A,S,D] / [方向鍵] 移動</span>
+            <span>[空白鍵] 暫停</span>
+        </div>
+        <div class="md:hidden text-xs text-slate-500 uppercase tracking-widest flex items-center justify-center gap-2">
+            <span>✨ 支援螢幕滑動操控 ✨</span>
+        </div>
+    </footer>
+
+    <!-- 遊戲結束彈出式視窗 Modal -->
+    <div id="gameOverModal" class="fixed inset-0 z-50 bg-darkBg/90 backdrop-blur-lg flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="w-full max-w-sm glass-panel rounded-3xl p-8 text-center border border-white/10 shadow-neon-pink">
+            <div class="w-16 h-16 bg-neonPink/10 border border-neonPink/30 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-neonPink text-neon-pink" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+            </div>
+            
+            <h3 class="text-3xl font-black text-neonPink text-neon-pink tracking-widest mb-2">SYSTEM OVERLOAD</h3>
+            <p class="text-sm text-slate-400 mb-6">蛇身遭受致命碰撞，模擬終止。</p>
+            
+            <div class="grid grid-cols-2 gap-4 mb-8 bg-white/5 rounded-2xl p-4 border border-white/5">
+                <div>
+                    <span class="text-[10px] text-slate-400 uppercase tracking-wider block">最終得分</span>
+                    <span id="finalScore" class="text-2xl font-bold text-neonCyan">0</span>
+                </div>
+                <div>
+                    <span class="text-[10px] text-slate-400 uppercase tracking-wider block">歷史最高</span>
+                    <span id="finalBest" class="text-2xl font-bold text-neonPink">0</span>
+                </div>
+            </div>
+
+            <button id="modalRestartBtn" class="w-full py-4 rounded-xl font-bold uppercase tracking-widest text-darkBg bg-gradient-to-r from-neonPink to-neonPurple hover:from-neonPurple hover:to-neonCyan hover:text-white transition-all duration-300 shadow-neon-pink">
+                重啟系統
+            </button>
+        </div>
+    </div>
+
+    <!-- 遊戲核心 JavaScript 邏輯 -->
+    <script>
+        // --- 1. 初始化與全域設定 ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('highScore');
+        const overlay = document.getElementById('overlay');
+        const overlayTitle = document.getElementById('overlayTitle');
+        const overlaySub = document.getElementById('overlaySub');
+        const startBtn = document.getElementById('startBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const soundBtn = document.getElementById('soundBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const gameOverModal = document.getElementById('gameOverModal');
+        const finalScoreEl = document.getElementById('finalScore');
+        const finalBestEl = document.getElementById('finalBest');
+        const modalRestartBtn = document.getElementById('modalRestartBtn');
+        
+        // 畫布格線系統
+        const gridSize = 20; // 20x20 格子
+        let cellSize;        // 每格像素寬度 (動態計算)
+
+        // 遊戲狀態變數
+        let snake = [];
+        let direction = { x: 0, y: 0 };
+        let nextDirection = { x: 0, y: 0 };
+        let food = { x: 0, y: 0, pulse: 0, color: '#ff007f' };
+        let score = 0;
+        let highScore = parseInt(localStorage.getItem('neon_snake_highscore')) || 0;
+        let isPlaying = false;
+        let isPaused = false;
+        let soundEnabled = true;
+
+        // 60 FPS 動畫控制 ticks
+        let lastTickTime = 0;
+        let gameSpeed = 160; // 初始 tick 時間 (毫秒)，越小越快
+        const minSpeed = 65;  // 極限高速
+
+        // 粒子系統陣列
+        let particles = [];
+
+        // 聲音合成器
+        let audioCtx = null;
+
+        // --- 2. 響應式 High-DPI 畫布初始化 ---
+        function resizeCanvas() {
+            // 獲取畫布的顯示尺寸 (容器自適應寬度)
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const size = Math.min(rect.width, rect.height) - 8; // 扣除內邊距
+            
+            // 為了在高解析度螢幕上維持極致清晰的霓虹線條
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            
+            // 縮放繪圖上下文以匹配高 DPI
+            ctx.scale(dpr, dpr);
+            
+            // 計算邏輯單元大小
+            cellSize = size / gridSize;
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // --- 3. 音效合成系統 (Web Audio API) ---
+        // 免去加載外部檔案的負擔，用程式碼實時演奏 8-bit 電子聲
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'move') {
+                // 短促清脆的移動音
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'eat') {
+                // 快節奏向上滑音 (獲得金幣感)
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+                osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+                osc.frequency.exponentialRampToValueAtTime(1046.50, now + 0.25); // C6
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'crash') {
+                // 爆炸沉悶的撞擊聲
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.linearRampToValueAtTime(40, now + 0.4);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now);
+                osc.stop(now + 0.4);
+            } else if (type === 'click') {
+                // 按鍵回饋聲
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+        }
+
+        // --- 4. 粒子特效系統 ---
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 6; // 隨機 X 速度
+                this.vy = (Math.random() - 0.5) * 6; // 隨機 Y 速度
+                this.radius = Math.random() * 3 + 1;  // 隨機半徑
+                this.color = color;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.03 + 0.015; // 隨機淡出速度
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= this.decay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function createExplosion(gridX, gridY, color) {
+            const centerX = gridX * cellSize + cellSize / 2;
+            const centerY = gridY * cellSize + cellSize / 2;
+            for (let i = 0; i < 20; i++) {
+                particles.push(new Particle(centerX, centerY, color));
+            }
+        }
+
+        // --- 5. 遊戲主核心邏輯 ---
+        
+        // 初始蛇、計分、速度
+        function initGame() {
+            snake = [
+                { x: 10, y: 10 },
+                { x: 10, y: 11 },
+                { x: 10, y: 12 }
+            ];
+            direction = { x: 0, y: -1 }; // 預設朝上移動
+            nextDirection = { x: 0, y: -1 };
+            score = 0;
+            gameSpeed = 160;
+            scoreEl.textContent = '000';
+            highScoreEl.textContent = String(highScore).padStart(3, '0');
+            particles = [];
+            generateFood();
+            
+            // 啟用控制按鈕
+            pauseBtn.disabled = false;
+            pauseBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        // 隨機產生食物
+        function generateFood() {
+            // 避開生長在蛇身上
+            let valid = false;
+            let rx, ry;
+            while (!valid) {
+                rx = Math.floor(Math.random() * gridSize);
+                ry = Math.floor(Math.random() * gridSize);
+                valid = true;
+                for (let part of snake) {
+                    if (part.x === rx && part.y === ry) {
+                        valid = false;
+                        break;
+                    }
+                }
+            }
+            food.x = rx;
+            food.y = ry;
+            // 隨機變換霓虹粉與霓虹青色食物
+            food.color = Math.random() > 0.4 ? '#ff007f' : '#00f3ff';
+        }
+
+        // 鍵盤輸入事件
+        function handleInput(key) {
+            if (!isPlaying || isPaused) return;
+
+            let prevDir = direction;
+            let targetDir = { x: 0, y: 0 };
+
+            switch(key) {
+                case 'ArrowUp':
+                case 'KeyW':
+                case 'w':
+                case 'W':
+                    targetDir = { x: 0, y: -1 };
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                case 's':
+                case 'S':
+                    targetDir = { x: 0, y: 1 };
+                    break;
+                case 'ArrowLeft':
+                case 'KeyA':
+                case 'a':
+                case 'A':
+                    targetDir = { x: -1, y: 0 };
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                case 'd':
+                case 'D':
+                    targetDir = { x: 1, y: 0 };
+                    break;
+                default:
+                    return; // 忽略其他按鍵
+            }
+
+            // 避免朝相反方向直接轉向 (例如正在向上走時，無法直接按向下)
+            if (targetDir.x !== 0 && prevDir.x === 0) {
+                nextDirection = targetDir;
+                playSound('move');
+            } else if (targetDir.y !== 0 && prevDir.y === 0) {
+                nextDirection = targetDir;
+                playSound('move');
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            // 當在遊玩中時，避免按方向鍵與空白鍵造成網頁捲動
+            if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+                e.preventDefault();
+            }
+
+            if (e.code === 'Space') {
+                togglePause();
+                return;
+            }
+
+            handleInput(e.code);
+        });
+
+        // 觸控滑動手勢 (行動裝置優化)
+        let touchStartX = 0;
+        let touchStartY = 0;
+        const swipeThreshold = 30; // 判定為滑動的最小像素位移
+
+        window.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        window.addEventListener('touchend', (e) => {
+            if (!isPlaying || isPaused) return;
+
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+
+            // 判斷是以 X 軸滑動為主，還是 Y 軸為主
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (Math.abs(dx) > swipeThreshold) {
+                    if (dx > 0) handleInput('ArrowRight');
+                    else handleInput('ArrowLeft');
+                }
+            } else {
+                if (Math.abs(dy) > swipeThreshold) {
+                    if (dy > 0) handleInput('ArrowDown');
+                    else handleInput('ArrowUp');
+                }
+            }
+        }, { passive: true });
+
+        // --- 6. 核心更新函數 ---
+        function update() {
+            // 更新方向
+            direction = nextDirection;
+
+            // 計算下一個蛇頭位置
+            const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+
+            // 1. 撞擊邊界判定
+            if (head.x < 0 || head.x >= gridSize || head.y < 0 || head.y >= gridSize) {
+                endGame();
+                return;
+            }
+
+            // 2. 撞擊自身判定
+            for (let part of snake) {
+                if (part.x === head.x && part.y === head.y) {
+                    endGame();
+                    return;
+                }
+            }
+
+            // 將新蛇頭插到陣列首位
+            snake.unshift(head);
+
+            // 3. 吃下食物判定
+            if (head.x === food.x && head.y === food.y) {
+                score += 10;
+                scoreEl.textContent = String(score).padStart(3, '0');
+                
+                // 炫目粒子爆破特效
+                createExplosion(food.x, food.y, food.color);
+                playSound('eat');
+
+                // 產生新食物
+                generateFood();
+
+                // 隨分數提高速度 (最低降至 65ms 一步)
+                if (gameSpeed > minSpeed) {
+                    gameSpeed = Math.max(minSpeed, 160 - Math.floor(score / 30) * 10);
+                }
+            } else {
+                // 如果沒吃到食物，將蛇尾移出
+                snake.pop();
+            }
+        }
+
+        // --- 7. 渲染繪製函數 ---
+        function draw() {
+            // 清理畫布 (使用微透的底色，產生酷炫的螢幕動態殘影拖尾效果)
+            ctx.fillStyle = 'rgba(9, 13, 22, 0.4)';
+            ctx.fillRect(0, 0, canvas.width / (window.devicePixelRatio || 1), canvas.height / (window.devicePixelRatio || 1));
+
+            // 繪製背景網格線 (科技感微弱背景)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= gridSize; i++) {
+                // 直線
+                ctx.beginPath();
+                ctx.moveTo(i * cellSize, 0);
+                ctx.lineTo(i * cellSize, gridSize * cellSize);
+                ctx.stroke();
+
+                // 橫線
+                ctx.beginPath();
+                ctx.moveTo(0, i * cellSize);
+                ctx.lineTo(gridSize * cellSize, i * cellSize);
+                ctx.stroke();
+            }
+
+            // 食物縮放呼吸律動
+            food.pulse += 0.15;
+            const pulseScale = 1 + Math.sin(food.pulse) * 0.12;
+
+            // 繪製食物 (具備發光霓虹效果)
+            ctx.save();
+            ctx.shadowBlur = 18;
+            ctx.shadowColor = food.color;
+            ctx.fillStyle = food.color;
+            ctx.beginPath();
+            const foodCenterX = food.x * cellSize + cellSize / 2;
+            const foodCenterY = food.y * cellSize + cellSize / 2;
+            const foodRadius = (cellSize / 2.5) * pulseScale;
+            ctx.arc(foodCenterX, foodCenterY, foodRadius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 繪製蛇身 (具有發光與漸層霓虹)
+            snake.forEach((part, index) => {
+                ctx.save();
+                
+                // 設定霓虹漸層色
+                const ratio = index / snake.length;
+                let bodyColor;
+                if (index === 0) {
+                    bodyColor = '#00f3ff'; // 蛇頭永遠是明亮的霓虹青
+                } else {
+                    // 身體呈現 青色 -> 紫色 -> 粉色 漸層
+                    bodyColor = blendColors('#00f3ff', '#9d4edd', ratio);
+                }
+
+                ctx.fillStyle = bodyColor;
+                ctx.shadowBlur = index === 0 ? 20 : 12; // 蛇頭光暈更大
+                ctx.shadowColor = bodyColor;
+
+                // 圓角矩形蛇身
+                const pad = 1.5; // 格子微縮進，凸顯單節美感
+                const x = part.x * cellSize + pad;
+                const y = part.y * cellSize + pad;
+                const w = cellSize - pad * 2;
+                const h = cellSize - pad * 2;
+                const r = index === 0 ? w / 2 : w / 4; // 蛇頭做圓頭形狀
+
+                ctx.beginPath();
+                ctx.roundRect(x, y, w, h, r);
+                ctx.fill();
+
+                // 額外細節：給蛇頭畫上一對極簡科技眼睛
+                if (index === 0) {
+                    ctx.shadowBlur = 0; // 關閉眼睛的光暈免得糊掉
+                    ctx.fillStyle = '#ffffff';
+                    
+                    // 根據移動方向微調眼睛位置
+                    let eyeX1, eyeY1, eyeX2, eyeY2;
+                    const eyeOffset = cellSize / 4;
+                    const eyeSize = cellSize / 8;
+
+                    if (direction.x !== 0) { // 左右移動
+                        eyeX1 = x + (direction.x > 0 ? cellSize * 0.6 : cellSize * 0.2);
+                        eyeY1 = y + eyeOffset;
+                        eyeX2 = eyeX1;
+                        eyeY2 = y + cellSize - eyeOffset - eyeSize;
+                    } else { // 上下移動
+                        eyeX1 = x + eyeOffset;
+                        eyeY1 = y + (direction.y > 0 ? cellSize * 0.6 : cellSize * 0.2);
+                        eyeX2 = x + cellSize - eyeOffset - eyeSize;
+                        eyeY2 = eyeY1;
+                    }
+
+                    ctx.fillRect(eyeX1, eyeY1, eyeSize, eyeSize);
+                    ctx.fillRect(eyeX2, eyeY2, eyeSize, eyeSize);
+                }
+
+                ctx.restore();
+            });
+
+            // 更新並繪製粒子
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                } else {
+                    p.draw();
+                }
+            }
+        }
+
+        // 漸層色計算輔助函數
+        function blendColors(colorA, colorB, amount) {
+            const [rA, gA, bA] = colorA.match(/\w\w/g).map((c) => parseInt(c, 16));
+            const [rB, gB, bB] = colorB.match(/\w\w/g).map((c) => parseInt(c, 16));
+            const r = Math.round(rA + (rB - rA) * amount);
+            const g = Math.round(gA + (gB - gA) * amount);
+            const b = Math.round(bA + (bB - bA) * amount);
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        // HTML5 畫圖圓角相容性處理 (部分極舊瀏覽器)
+        if (!CanvasRenderingContext2D.prototype.roundRect) {
+            CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+                if (w < 2 * r) r = w / 2;
+                if (h < 2 * r) r = h / 2;
+                this.moveTo(x + r, y);
+                this.arcTo(x + w, y, x + w, y + h, r);
+                this.arcTo(x + w, y + h, x, y + h, r);
+                this.arcTo(x, y + h, x, y, r);
+                this.arcTo(x, y, x + w, y, r);
+                return this;
+            };
+        }
+
+        // --- 8. 遊戲控制流程與主循環 (60 FPS) ---
+        function gameLoop(timestamp) {
+            if (!isPlaying) return;
+
+            // 核心 60 FPS 幀渲染
+            requestAnimationFrame(gameLoop);
+
+            if (isPaused) {
+                // 如果暫停了，只渲染畫面 (用以渲染粒子背景)，不更新蛇的位置
+                draw();
+                return;
+            }
+
+            // 使用時間差精準控制蛇的移動速度 (非綁定螢幕更新率)
+            if (!lastTickTime) lastTickTime = timestamp;
+            const delta = timestamp - lastTickTime;
+
+            if (delta >= gameSpeed) {
+                update();
+                lastTickTime = timestamp;
+            }
+
+            // 每幀持續渲染 Canvas
+            draw();
+        }
+
+        function startGame() {
+            playSound('click');
+            overlay.classList.add('opacity-0');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+            }, 300);
+
+            initGame();
+            isPlaying = true;
+            isPaused = false;
+            lastTickTime = 0;
+            requestAnimationFrame(gameLoop);
+        }
+
+        function togglePause() {
+            if (!isPlaying) return;
+            playSound('click');
+            isPaused = !isPaused;
+
+            const pauseIcon = document.getElementById('pauseIcon');
+            const pauseText = document.getElementById('pauseText');
+
+            if (isPaused) {
+                pauseText.textContent = "繼續";
+                // 改為播放 Icon
+                pauseIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />`;
+                
+                // 顯示暫停狀態覆蓋層
+                overlayTitle.textContent = "SYSTEM PAUSED";
+                overlaySub.textContent = "模擬暫停中。按下下方按鈕或空白鍵繼續旅程。";
+                startBtn.textContent = "繼續遊戲";
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+            } else {
+                pauseText.textContent = "暫停";
+                // 改回暫停 Icon
+                pauseIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />`;
+                
+                overlay.classList.add('opacity-0');
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                }, 300);
+            }
+        }
+
+        function endGame() {
+            isPlaying = false;
+            playSound('crash');
+
+            // 檢查並更新最高分
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('neon_snake_highscore', highScore);
+            }
+
+            // 更新 Modal 資訊
+            finalScoreEl.textContent = score;
+            finalBestEl.textContent = highScore;
+
+            // 彈出 Game Over 視窗
+            gameOverModal.classList.remove('hidden');
+            setTimeout(() => {
+                gameOverModal.classList.remove('opacity-0');
+            }, 50);
+
+            // 停用暫停按鈕
+            pauseBtn.disabled = true;
+            pauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
+        function forceRestart() {
+            playSound('click');
+            // 關閉所有視窗與覆蓋畫面
+            gameOverModal.classList.add('opacity-0');
+            setTimeout(() => {
+                gameOverModal.classList.add('hidden');
+            }, 300);
+
+            overlay.classList.add('opacity-0');
+            setTimeout(() => {
+                overlay.classList.add('hidden');
+            }, 300);
+
+            // 重製暫停按鈕 UI
+            const pauseIcon = document.getElementById('pauseIcon');
+            const pauseText = document.getElementById('pauseText');
+            pauseText.textContent = "暫停";
+            pauseIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />`;
+
+            initGame();
+            isPlaying = true;
+            isPaused = false;
+            lastTickTime = 0;
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- 9. 按鈕與事件綁定 ---
+        startBtn.addEventListener('click', () => {
+            if (isPaused) {
+                togglePause();
+            } else {
+                startGame();
+            }
+        });
+        
+        pauseBtn.addEventListener('click', togglePause);
+        
+        resetBtn.addEventListener('click', forceRestart);
+        
+        modalRestartBtn.addEventListener('click', forceRestart);
+
+        // 音量切換控制
+        soundBtn.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            const soundIcon = document.getElementById('soundIcon');
+            const soundSpan = soundBtn.querySelector('span');
+
+            if (soundEnabled) {
+                soundSpan.textContent = "音效: 開";
+                soundIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />`;
+                playSound('click');
+            } else {
+                soundSpan.textContent = "音效: 關";
+                soundIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />`;
+            }
+        });
+
+        // 網頁初次載入渲染
+        draw();
+    </script>
+</body>
+</html>
